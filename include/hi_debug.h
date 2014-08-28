@@ -102,7 +102,7 @@ typedef enum hiLOG_LEVEL_E
 extern HI_VOID HI_LogOut(HI_U32 u32Level, HI_MOD_ID_E enModId,
             HI_U8 *pFuncName, HI_U32 u32LineNum, const char *format, ...);
 
-#ifdef HI_DEBUG
+#if 0
 
 #define HI_TRACE(level, module_id, fmt...)                      \
     do{                                                         \

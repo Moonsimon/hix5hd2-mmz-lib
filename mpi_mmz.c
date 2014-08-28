@@ -38,7 +38,7 @@
 #include "hi_debug.h"
 #include "hi_drv_struct.h"
 #include "drv_mem_ioctl.h"
-//#include "hi_mpi_mem.h"
+#include "hi_drv_mem.h"
 
 
 #define MMZ_DEVNAME "/dev/mmz_userdev"
@@ -161,6 +161,59 @@ HI_S32 HI_MPI_MMZ_Malloc(HI_MMZ_BUF_S *pstBuf)
     return HI_SUCCESS;
 }
 
+HI_S32 HI_MMZ_Malloc(HI_MMZ_BUF_S *pstBuf)
+{
+    HI_S32 l_return;
+    struct mmb_info mmi = {0};
+
+    CHECK_MEM_OPEN_STATE();
+
+    /*parameters check*/
+    if (NULL == pstBuf)
+    {
+        HI_ERR_MEM("%s:pBuf is NULL pointer!\n", __FUNCTION__);
+        return HI_FAILURE;
+    }
+
+    if (strlen(pstBuf->bufname) >= MAX_BUFFER_NAME_SIZE)
+    {
+        HI_ERR_MEM("%s:the buffer name len is overflow!\n", __FUNCTION__);
+        return HI_FAILURE;
+    }
+
+    mmi.size = pstBuf->bufsize;
+    mmi.align = 0x1000;
+    strncpy(mmi.mmb_name, pstBuf->bufname, HIL_MMB_NAME_LEN);
+
+    MEM_LOCK(&g_mem_mutex);
+
+    /*call ioctl to malloc*/
+    l_return = MEM_IOCTL(g_s32fd, IOC_MMB_ALLOC, &mmi);
+    if (l_return != 0)
+    {
+        MEM_UNLOCK(&g_mem_mutex);
+        return HI_FAILURE;
+    }
+
+    /*call ioctl to user addr remap*/
+    mmi.prot = PROT_READ | PROT_WRITE;
+    mmi.flags = MAP_SHARED;
+    l_return = MEM_IOCTL(g_s32fd, IOC_MMB_USER_REMAP, &mmi);
+    if (l_return != 0)
+    {
+        MEM_IOCTL(g_s32fd, IOC_MMB_FREE, &mmi);
+        MEM_UNLOCK(&g_mem_mutex);
+        return HI_FAILURE;
+    }
+
+    pstBuf->phyaddr = mmi.phys_addr;
+    pstBuf->user_viraddr = (HI_U8 *)mmi.mapped;
+    pstBuf->overflow_threshold = 100;
+    pstBuf->underflow_threshold = 0;
+
+    MEM_UNLOCK(&g_mem_mutex);
+    return HI_SUCCESS;
+}
 
 /*****************************************************************************
  Prototype    : HI_MPI_MMZ_Free
@@ -211,6 +264,40 @@ HI_S32 HI_MPI_MMZ_Free(HI_MMZ_BUF_S *pstBuf)
     }
 }
 
+HI_S32 HI_MMZ_Free(HI_MMZ_BUF_S *pstBuf)
+{
+    HI_S32 l_return;
+    struct mmb_info mmi;
+
+    CHECK_MEM_OPEN_STATE();
+
+    /*parameters check*/
+    if (NULL == pstBuf)
+    {
+        HI_ERR_MEM("%s:pBuf is NULL pointer!\n", __FUNCTION__);
+        return HI_FAILURE;
+    }
+
+    mmi.phys_addr = pstBuf->phyaddr;
+    mmi.mapped = (void *)pstBuf->user_viraddr;
+
+    MEM_LOCK(&g_mem_mutex);
+
+    MEM_IOCTL(g_s32fd, IOC_MMB_USER_UNMAP, &mmi);
+
+    /*call ioctl to free*/
+    l_return = MEM_IOCTL(g_s32fd, IOC_MMB_FREE, &mmi);
+    if (l_return == HI_SUCCESS)
+    {
+        MEM_UNLOCK(&g_mem_mutex);
+        return HI_SUCCESS;
+    }
+    else
+    {
+        MEM_UNLOCK(&g_mem_mutex);
+        return HI_FAILURE;
+    }
+}
 
 HI_VOID *HI_MPI_MMZ_New(HI_U32 u32Size , HI_U32 u32Align, HI_CHAR *ps8MMZName, HI_CHAR *ps8MMBName)
 {
@@ -271,6 +358,11 @@ HI_S32 HI_MPI_MMZ_GetPhyAddr(HI_VOID *pRefAddr, HI_U32 *pu32PhyAddr, HI_U32 *pu3
     return 0;
 }
 
+HI_S32 HI_MMZ_GetPhyaddr(HI_VOID *pRefAddr, HI_U32 *pu32PhyAddr, HI_U32 *pu32Size)
+{
+    return HI_MPI_MMZ_GetPhyAddr(pRefAddr, pu32PhyAddr, pu32Size);
+}
+
 HI_VOID *HI_MPI_MMZ_Map(HI_U32 u32PhysAddr, HI_U32 u32Cached)
 {
     struct mmb_info mmi = {0};
@@ -323,6 +415,12 @@ HI_S32 HI_MPI_MMZ_Unmap(HI_U32 u32PhysAddr)
 
     return ioctl(g_s32fd, IOC_MMB_USER_UNMAP, &mmi);
 
+}
+
+HI_S32 HI_MEM_Unmap(void * u32PhysAddr)
+{
+    return 0;
+   // return HI_MPI_MMZ_Unmap(u32PhysAddr);
 }
 
 HI_S32 HI_MPI_MMZ_Flush(HI_U32 u32PhysAddr)

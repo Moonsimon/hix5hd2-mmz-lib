@@ -2,18 +2,17 @@ CROSS_COMPILE=arm-hisiv200-linux-
 CC=${CROSS_COMPILE}gcc
 AR=${CROSS_COMPILE}ar
 
-CFLAGS += 
+CFLAGS +=
 CFLAGS += -I${CURDIR}/include -I${CURDIR}
 
 LIBS := libhi_mmz
-        
-OBJS := mpi_mmz.o      
+OBJS := mpi_mmz.o
 
 
 #===============================================================================
 # rules
 #===============================================================================
-.PHONY: all clean 
+.PHONY: all clean
 
 all: $(LIBS)
 
@@ -24,4 +23,4 @@ clean:
 
 $(LIBS): $(OBJS)
 	$(AR) -rcs $@.a $^
-	$(CC) -shared -o $@.so $^
+	$(CC) -shared -lpthread -o $@.so $^
