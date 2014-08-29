@@ -23,4 +23,4 @@ clean:
 
 $(LIBS): $(OBJS)
 	$(AR) -rcs $@.a $^
-	$(CC) -shared -lpthread -o $@.so $^
+	$(CC) -shared $(CFLAGS) -lpthread -o $@.so $^
