@@ -2,7 +2,7 @@ CROSS_COMPILE=arm-hisiv200-linux-
 CC=${CROSS_COMPILE}gcc
 AR=${CROSS_COMPILE}ar
 
-CFLAGS +=
+CURDIR=.
 CFLAGS += -I${CURDIR}/include -I${CURDIR}
 
 LIBS := libhi_mmz
